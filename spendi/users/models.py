@@ -34,16 +34,18 @@ class Debt(object):
         return self.__unicode__()
 
 
-class UserGroup(models.Model):
+class SpendiGroup(models.Model):
     """
     A group of users, such as a household or business.
     """
     name = CharField(max_length=200)
-    slug = CharField(max_length=65)
+    slug = CharField(max_length=65, unique=True)
     description = TextField()
     users = ManyToManyField(User, through='GroupMembership')
+    last_update = DateTimeField(auto_now=True)
 
-    def cook_books(self):
+    @property
+    def books(self):
         """
         Implementation of the min
         """
@@ -54,6 +56,9 @@ class UserGroup(models.Model):
         transfers = Transfer.objects.filter(group=self)
 
         for e in expenditures:
+            if not e.users.all().count():
+                logging.warning("Expenditure with no shares?  Ignoring -- please fix!")
+                continue
             logging.debug("Expenditure: %s spent %s" % (e.spender, e.amount))
             users_owe[e.spender] -= round(e.amount, 2)
             for u in e.users.all():
@@ -118,17 +123,29 @@ class UserGroup(models.Model):
 
         return owe_each_other
 
-    def spend(self, spender, amount, shares):
+    def residents(self):
+        return User.objects.filter(id__in=GroupMembership.objects.filter(group=self, resident=True).values_list('user', flat=True))
+
+    def spend(self, spender, amount, description, shares=None):
         from spendi.books.models import Expenditure, ExpenditureSplit
 
-        e = Expenditure(group=self, spender=spender, amount=amount, created_by=spender, updated_by=spender)
+        if not shares:
+            shares = list((u, 1) for u in self.residents())
+            logging.debug("shares are %s" % shares)
+
+        e = Expenditure(group=self,
+                        spender=spender,
+                        amount=amount,
+                        created_by=spender,
+                        updated_by=spender,
+                        description=description)
         e.save()
         for s in shares:
             ExpenditureSplit(expenditure=e, user=s[0], share=s[1]).save()
         return e
 
     def user_owes(self, user, to):
-        books = self.cook_books()
+        books = self.books
         if not len(books[to]): return 0.0
         for t in books[to]:
             if t.user == user:
@@ -140,9 +157,11 @@ class GroupMembership(models.Model):
     """
     Intermediate model representing group ownership.
     """
-
-    group = ForeignKey(UserGroup)
+    group = ForeignKey(SpendiGroup)
     user = ForeignKey(User)
     joined = DateTimeField(auto_now_add=True)
     resident = BooleanField(default=False)
     active = BooleanField(default=True)
+
+    class Meta:
+        unique_together=('group', 'user')

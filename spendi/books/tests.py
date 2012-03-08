@@ -7,13 +7,13 @@ Replace this with more appropriate tests for your application.
 from django.contrib.auth.models import User
 
 from django.test import TestCase
-from spendi.users.models import GroupMembership, UserGroup
+from spendi.users.models import GroupMembership, SpendiGroup
 
 
 class BooksTest(TestCase):
 
     def create_users(self):
-        group = UserGroup.objects.create(name="Our House")
+        group = SpendiGroup.objects.create(name="Our House")
         group.save()
         alice = User.objects.create(username='alice')
         alice.save()

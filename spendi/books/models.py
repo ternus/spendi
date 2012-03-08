@@ -1,21 +1,23 @@
 from django.contrib.auth.models import User
 from django.db import models
-from spendi.users.models import UserGroup
-from django.db.models.fields import DateTimeField, FloatField, CharField
+from spendi.users.models import SpendiGroup
+from django.db.models.fields import DateTimeField, FloatField, CharField, TextField
 from django.db.models.fields.related import ForeignKey, ManyToManyField
 from currencies import currencies
 
 class Expenditure(models.Model):
-    group = ForeignKey(UserGroup)
+    group = ForeignKey(SpendiGroup)
 
     spender = ForeignKey(User, related_name="spender")
 
     created = DateTimeField(auto_now_add=True)
-    created_by = ForeignKey(User, related_name="creator", blank=True)
+    created_by = ForeignKey(User, related_name="creator", blank=True,null=True)
     updated = DateTimeField(auto_now=True)
-    updated_by = ForeignKey(User, related_name="updater", blank=True)
+    updated_by = ForeignKey(User, related_name="updater", blank=True,null=True)
 
     users = ManyToManyField(User, through='ExpenditureSplit')
+
+    description = TextField(blank=True,null=True)
 
     amount = FloatField()
     currency = CharField(max_length=3, choices=currencies)
@@ -36,7 +38,7 @@ class ExpenditureSplit(models.Model):
     share = FloatField(default=1.0)
 
 class Transfer(models.Model):
-    group = ForeignKey(UserGroup)
+    group = ForeignKey(SpendiGroup)
 
     from_user = ForeignKey(User, related_name="from_user")
     to_user = ForeignKey(User, related_name="to_user")
